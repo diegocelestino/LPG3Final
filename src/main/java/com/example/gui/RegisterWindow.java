@@ -2,7 +2,9 @@ package com.example.gui;
 
 import com.example.model.Address;
 import com.example.model.Client;
+
 import com.example.service.FirebaseService;
+import com.example.service.ViaCepService;
 
 import javax.swing.*;
 import java.awt.*;
@@ -59,12 +61,30 @@ public class RegisterWindow extends JFrame {
         // Address Information Section
         addSectionTitle(formPanel, gbc, row++, "Address Information");
         
+        // Zip Code with Search Button
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.weightx = 0.3;
+        JLabel zipLabel = new JLabel("Zip Code (CEP):");
+        formPanel.add(zipLabel, gbc);
+        
+        gbc.gridx = 1;
+        gbc.weightx = 0.5;
+        zipCodeField = new JTextField(20);
+        formPanel.add(zipCodeField, gbc);
+        
+        gbc.gridx = 2;
+        gbc.weightx = 0.2;
+        JButton searchCepButton = new JButton("Search CEP");
+        searchCepButton.addActionListener(e -> searchCep());
+        formPanel.add(searchCepButton, gbc);
+        row++;
+        
         streetField = addFormField(formPanel, gbc, row++, "Street:");
         numberField = addFormField(formPanel, gbc, row++, "Number:");
-        complementField = addFormField(formPanel, gbc, row++, "Complement:");
+        complementField = addFormField(formPanel, gbc, row++, "Complement (optional):");
         cityField = addFormField(formPanel, gbc, row++, "City:");
         stateField = addFormField(formPanel, gbc, row++, "State:");
-        zipCodeField = addFormField(formPanel, gbc, row++, "Zip Code:");
         
         JScrollPane scrollPane = new JScrollPane(formPanel);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
@@ -119,6 +139,13 @@ public class RegisterWindow extends JFrame {
         // Validate required fields
         if (nameField.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Name is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            nameField.requestFocus();
+            return;
+        }
+        
+        if (emailField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Email is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            emailField.requestFocus();
             return;
         }
         
@@ -129,17 +156,49 @@ public class RegisterWindow extends JFrame {
                 "CPF must contain exactly 11 digits (numbers only)!", 
                 "Validation Error", 
                 JOptionPane.ERROR_MESSAGE);
+            cpfField.requestFocus();
             return;
         }
         
-        // Create Address
+        // Validate address fields (complement is optional)
+        if (zipCodeField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Zip Code is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            zipCodeField.requestFocus();
+            return;
+        }
+        
+        if (streetField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Street is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            streetField.requestFocus();
+            return;
+        }
+        
+        if (numberField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Number is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            numberField.requestFocus();
+            return;
+        }
+        
+        if (cityField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "City is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            cityField.requestFocus();
+            return;
+        }
+        
+        if (stateField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "State is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            stateField.requestFocus();
+            return;
+        }
+        
+        // Create Address (complement is optional, can be empty)
         Address address = new Address();
-        address.setStreet(streetField.getText());
-        address.setNumber(numberField.getText());
-        address.setComplement(complementField.getText());
-        address.setCity(cityField.getText());
-        address.setState(stateField.getText());
-        address.setZipCode(zipCodeField.getText());
+        address.setStreet(streetField.getText().trim());
+        address.setNumber(numberField.getText().trim());
+        address.setComplement(complementField.getText().trim()); // Optional
+        address.setCity(cityField.getText().trim());
+        address.setState(stateField.getText().trim());
+        address.setZipCode(zipCodeField.getText().trim());
         
         // Create Client with auto-generated ID
         Client client = new Client();
@@ -189,6 +248,79 @@ public class RegisterWindow extends JFrame {
         cityField.setText("");
         stateField.setText("");
         zipCodeField.setText("");
+    }
+    
+    private void searchCep() {
+        String cep = zipCodeField.getText().trim();
+        
+        if (cep.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "Please enter a CEP", 
+                "Validation Error", 
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        // Disable button during search
+        Component[] components = ((JPanel)zipCodeField.getParent()).getComponents();
+        JButton searchButton = null;
+        for (Component comp : components) {
+            if (comp instanceof JButton && ((JButton)comp).getText().equals("Search CEP")) {
+                searchButton = (JButton) comp;
+                break;
+            }
+        }
+        
+        if (searchButton != null) {
+            searchButton.setEnabled(false);
+            searchButton.setText("Searching...");
+        }
+        
+        final JButton finalSearchButton = searchButton;
+        
+        // Call ViaCEP API in background thread
+        ViaCepService.getInstance()
+            .getAddressByCep(cep)
+            .thenAccept(response -> {
+                // Auto-fill form fields on UI thread
+                SwingUtilities.invokeLater(() -> {
+                    streetField.setText(response.getLogradouro() != null ? response.getLogradouro() : "");
+                    cityField.setText(response.getLocalidade() != null ? response.getLocalidade() : "");
+                    stateField.setText(response.getUf() != null ? response.getUf() : "");
+                    
+                    // Format and update CEP field
+                    String formattedCep = ViaCepService.getInstance().formatCep(response.getCep());
+                    zipCodeField.setText(formattedCep);
+                    
+                    // Show success toast
+                    Toast.show(this, "Address loaded successfully!", 2000);
+                    
+                    // Re-enable button
+                    if (finalSearchButton != null) {
+                        finalSearchButton.setEnabled(true);
+                        finalSearchButton.setText("Search CEP");
+                    }
+                    
+                    // Focus on number field for user to continue
+                    numberField.requestFocus();
+                });
+            })
+            .exceptionally(e -> {
+                // Show error on UI thread
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this,
+                        "Failed to fetch address:\n" + e.getMessage(),
+                        "CEP Error",
+                        JOptionPane.ERROR_MESSAGE);
+                    
+                    // Re-enable button
+                    if (finalSearchButton != null) {
+                        finalSearchButton.setEnabled(true);
+                        finalSearchButton.setText("Search CEP");
+                    }
+                });
+                return null;
+            });
     }
     
     private void goBack() {
