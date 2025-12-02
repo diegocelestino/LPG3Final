@@ -27,7 +27,6 @@ public class DataWindow extends JFrame {
         loadClients();
         startAutoRefresh();
         
-        // Stop thread when window closes
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
@@ -85,15 +84,12 @@ public class DataWindow extends JFrame {
     }
     
     private void loadClients() {
-        // Load from Firebase in background thread
         CompletableFuture.runAsync(() -> {
             try {
                 List<Client> clients = FirebaseService.getInstance().getAllClients().get();
                 
-                // Update local storage
                 ClientStorage.setClients(clients);
                 
-                // Update UI on Swing thread
                 SwingUtilities.invokeLater(() -> {
                     tableModel.setRowCount(0);
                     
@@ -145,15 +141,12 @@ public class DataWindow extends JFrame {
             JOptionPane.YES_NO_OPTION);
         
         if (confirm == JOptionPane.YES_OPTION) {
-            // Delete from Firebase in background
             CompletableFuture.runAsync(() -> {
                 try {
                     FirebaseService.getInstance().deleteClient(clientId).get();
                     
-                    // Remove from local storage
                     ClientStorage.removeClient(clientId);
                     
-                    // Reload table on UI thread
                     SwingUtilities.invokeLater(() -> {
                         loadClients();
                         Toast.show(this, "Client deleted successfully!", 2000);
@@ -176,10 +169,9 @@ public class DataWindow extends JFrame {
         autoRefreshThread = new Thread(() -> {
             while (isRunning) {
                 try {
-                    Thread.sleep(10000); // 10 seconds
+                    Thread.sleep(10000);
                     
                     if (isRunning) {
-                        // Update table on UI thread
                         SwingUtilities.invokeLater(() -> {
                             loadClients();
                             Toast.show(this, "Data refreshed - " + tableModel.getRowCount() + " clients", 2000);

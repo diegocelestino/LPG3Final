@@ -6,7 +6,6 @@ import javax.swing.*;
 
 public class Main {
     public static void main(String[] args) {
-        // Initialize Firebase before starting GUI
         FirebaseConfig.initialize();
         
         SwingUtilities.invokeLater(() -> {

@@ -51,17 +51,14 @@ public class RegisterWindow extends JFrame {
         
         int row = 0;
         
-        // Client Information Section
         addSectionTitle(formPanel, gbc, row++, "Client Information");
         
         nameField = addFormField(formPanel, gbc, row++, "Name:");
         emailField = addFormField(formPanel, gbc, row++, "Email:");
         cpfField = addFormField(formPanel, gbc, row++, "CPF (11 digits):");
         
-        // Address Information Section
         addSectionTitle(formPanel, gbc, row++, "Address Information");
         
-        // Zip Code with Search Button
         gbc.gridx = 0;
         gbc.gridy = row;
         gbc.weightx = 0.3;
@@ -136,7 +133,6 @@ public class RegisterWindow extends JFrame {
     }
     
     private void saveClient() {
-        // Validate required fields
         if (nameField.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Name is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
             nameField.requestFocus();
@@ -149,7 +145,6 @@ public class RegisterWindow extends JFrame {
             return;
         }
         
-        // Validate CPF
         String cpf = cpfField.getText().trim();
         if (!cpf.matches("\\d{11}")) {
             JOptionPane.showMessageDialog(this, 
@@ -160,7 +155,6 @@ public class RegisterWindow extends JFrame {
             return;
         }
         
-        // Validate address fields (complement is optional)
         if (zipCodeField.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Zip Code is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
             zipCodeField.requestFocus();
@@ -191,16 +185,14 @@ public class RegisterWindow extends JFrame {
             return;
         }
         
-        // Create Address (complement is optional, can be empty)
         Address address = new Address();
         address.setStreet(streetField.getText().trim());
         address.setNumber(numberField.getText().trim());
-        address.setComplement(complementField.getText().trim()); // Optional
+        address.setComplement(complementField.getText().trim());
         address.setCity(cityField.getText().trim());
         address.setState(stateField.getText().trim());
         address.setZipCode(zipCodeField.getText().trim());
         
-        // Create Client with auto-generated ID
         Client client = new Client();
         client.setId(java.util.UUID.randomUUID().toString());
         client.setName(nameField.getText());
@@ -208,15 +200,12 @@ public class RegisterWindow extends JFrame {
         client.setCpf(cpf);
         client.setAddress(address);
         
-        // Save to local storage first
         com.example.storage.ClientStorage.addClient(client);
         
-        // Save to Firebase in background thread
         CompletableFuture.runAsync(() -> {
             try {
                 FirebaseService.getInstance().saveClient(client).get();
                 
-                // Show success message on UI thread
                 SwingUtilities.invokeLater(() -> {
                     JOptionPane.showMessageDialog(this,
                         "Client saved successfully to Firebase!\n\nName: " + client.getName(),
@@ -226,7 +215,6 @@ public class RegisterWindow extends JFrame {
                 });
                 
             } catch (Exception e) {
-                // Show error message on UI thread
                 SwingUtilities.invokeLater(() -> {
                     JOptionPane.showMessageDialog(this,
                         "Saved locally but failed to sync with Firebase:\n" + e.getMessage(),
@@ -261,7 +249,6 @@ public class RegisterWindow extends JFrame {
             return;
         }
         
-        // Disable button during search
         Component[] components = ((JPanel)zipCodeField.getParent()).getComponents();
         JButton searchButton = null;
         for (Component comp : components) {
@@ -278,42 +265,34 @@ public class RegisterWindow extends JFrame {
         
         final JButton finalSearchButton = searchButton;
         
-        // Call ViaCEP API in background thread
         ViaCepService.getInstance()
             .getAddressByCep(cep)
             .thenAccept(response -> {
-                // Auto-fill form fields on UI thread
                 SwingUtilities.invokeLater(() -> {
                     streetField.setText(response.getLogradouro() != null ? response.getLogradouro() : "");
                     cityField.setText(response.getLocalidade() != null ? response.getLocalidade() : "");
                     stateField.setText(response.getUf() != null ? response.getUf() : "");
                     
-                    // Format and update CEP field
                     String formattedCep = ViaCepService.getInstance().formatCep(response.getCep());
                     zipCodeField.setText(formattedCep);
                     
-                    // Show success toast
                     Toast.show(this, "Address loaded successfully!", 2000);
                     
-                    // Re-enable button
                     if (finalSearchButton != null) {
                         finalSearchButton.setEnabled(true);
                         finalSearchButton.setText("Search CEP");
                     }
                     
-                    // Focus on number field for user to continue
                     numberField.requestFocus();
                 });
             })
             .exceptionally(e -> {
-                // Show error on UI thread
                 SwingUtilities.invokeLater(() -> {
                     JOptionPane.showMessageDialog(this,
                         "Failed to fetch address:\n" + e.getMessage(),
                         "CEP Error",
                         JOptionPane.ERROR_MESSAGE);
                     
-                    // Re-enable button
                     if (finalSearchButton != null) {
                         finalSearchButton.setEnabled(true);
                         finalSearchButton.setText("Search CEP");

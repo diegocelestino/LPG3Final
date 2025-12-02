@@ -22,7 +22,6 @@ public class Toast extends JDialog {
         add(panel);
         pack();
         
-        // Position at bottom center of parent
         if (parent != null) {
             int x = parent.getX() + (parent.getWidth() - getWidth()) / 2;
             int y = parent.getY() + parent.getHeight() - getHeight() - 50;
@@ -51,6 +50,6 @@ public class Toast extends JDialog {
     }
     
     public static void show(JFrame parent, String message) {
-        show(parent, message, 2000); // Default 2 seconds
+        show(parent, message, 2000);
     }
 }
