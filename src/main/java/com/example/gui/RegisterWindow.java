@@ -2,9 +2,11 @@ package com.example.gui;
 
 import com.example.model.Address;
 import com.example.model.Client;
+import com.example.service.FirebaseService;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.concurrent.CompletableFuture;
 
 public class RegisterWindow extends JFrame {
     
@@ -114,6 +116,12 @@ public class RegisterWindow extends JFrame {
     }
     
     private void saveClient() {
+        // Validate required fields
+        if (nameField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Name is required!", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
         // Create Address
         Address address = new Address();
         address.setStreet(streetField.getText());
@@ -131,17 +139,34 @@ public class RegisterWindow extends JFrame {
         client.setPhone(phoneField.getText());
         client.setAddress(address);
         
-        // Save to storage
+        // Save to local storage first
         com.example.storage.ClientStorage.addClient(client);
         
-        // Show success message
-        JOptionPane.showMessageDialog(this, 
-            "Client saved successfully!\n\nTotal clients: " + 
-            com.example.storage.ClientStorage.getClientCount(),
-            "Success",
-            JOptionPane.INFORMATION_MESSAGE);
-        
-        clearForm();
+        // Save to Firebase in background thread
+        CompletableFuture.runAsync(() -> {
+            try {
+                FirebaseService.getInstance().saveClient(client).get();
+                
+                // Show success message on UI thread
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this,
+                        "Client saved successfully to Firebase!\n\nName: " + client.getName(),
+                        "Success",
+                        JOptionPane.INFORMATION_MESSAGE);
+                    clearForm();
+                });
+                
+            } catch (Exception e) {
+                // Show error message on UI thread
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this,
+                        "Saved locally but failed to sync with Firebase:\n" + e.getMessage(),
+                        "Warning",
+                        JOptionPane.WARNING_MESSAGE);
+                });
+                e.printStackTrace();
+            }
+        });
     }
     
     private void clearForm() {
