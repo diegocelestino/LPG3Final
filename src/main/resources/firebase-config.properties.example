@@ -1,0 +1,8 @@
+# Firebase Configuration Template
+# Copy this file to firebase-config.properties and update with your values
+
+# Path to your Firebase service account JSON file
+firebase.serviceAccountPath=./serviceAccountKey.json
+
+# Your Firebase Realtime Database URL
+firebase.databaseUrl=https://your-project-id-default-rtdb.firebaseio.com

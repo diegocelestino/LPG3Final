@@ -30,7 +30,9 @@ mvnw.cmd
 # Firebase credentials (IMPORTANT - DO NOT COMMIT)
 serviceAccountKey.json
 **/serviceAccountKey.json
+src/main/serviceAccountKey.json
 firebase-config.properties
+src/main/resources/firebase-config.properties
 
 # OS files
 .DS_Store
