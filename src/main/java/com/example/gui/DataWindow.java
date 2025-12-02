@@ -1,17 +1,21 @@
 package com.example.gui;
 
 import com.example.model.Client;
+import com.example.service.FirebaseService;
 import com.example.storage.ClientStorage;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 public class DataWindow extends JFrame {
     
     private JTable clientTable;
     private DefaultTableModel tableModel;
+    private Thread autoRefreshThread;
+    private volatile boolean isRunning = true;
     
     public DataWindow() {
         setTitle("Client Data");
@@ -21,6 +25,15 @@ public class DataWindow extends JFrame {
         
         initComponents();
         loadClients();
+        startAutoRefresh();
+        
+        // Stop thread when window closes
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                stopAutoRefresh();
+            }
+        });
     }
     
     private void initComponents() {
@@ -33,7 +46,7 @@ public class DataWindow extends JFrame {
         mainPanel.add(titleLabel, BorderLayout.NORTH);
         
         // Table
-        String[] columnNames = {"ID", "Name", "Email", "Phone", "Street", "Number", "City", "State", "Zip Code"};
+        String[] columnNames = {"ID", "Name", "Email", "CPF", "Street", "Number", "City", "State", "Zip Code"};
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -55,7 +68,10 @@ public class DataWindow extends JFrame {
         JButton deleteButton = new JButton("Delete Selected");
         JButton backButton = new JButton("Back to Main");
         
-        refreshButton.addActionListener(e -> loadClients());
+        refreshButton.addActionListener(e -> {
+            loadClients();
+            Toast.show(this, "Data refreshed manually", 1500);
+        });
         deleteButton.addActionListener(e -> deleteSelectedClient());
         backButton.addActionListener(e -> goBack());
         
@@ -69,24 +85,44 @@ public class DataWindow extends JFrame {
     }
     
     private void loadClients() {
-        tableModel.setRowCount(0);
-        
-        List<Client> clients = ClientStorage.getAllClients();
-        
-        for (Client client : clients) {
-            Object[] row = {
-                client.getId(),
-                client.getName(),
-                client.getEmail(),
-                client.getPhone(),
-                client.getAddress() != null ? client.getAddress().getStreet() : "",
-                client.getAddress() != null ? client.getAddress().getNumber() : "",
-                client.getAddress() != null ? client.getAddress().getCity() : "",
-                client.getAddress() != null ? client.getAddress().getState() : "",
-                client.getAddress() != null ? client.getAddress().getZipCode() : ""
-            };
-            tableModel.addRow(row);
-        }
+        // Load from Firebase in background thread
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<Client> clients = FirebaseService.getInstance().getAllClients().get();
+                
+                // Update local storage
+                ClientStorage.setClients(clients);
+                
+                // Update UI on Swing thread
+                SwingUtilities.invokeLater(() -> {
+                    tableModel.setRowCount(0);
+                    
+                    for (Client client : clients) {
+                        Object[] row = {
+                            client.getId(),
+                            client.getName(),
+                            client.getEmail(),
+                            client.getCpf(),
+                            client.getAddress() != null ? client.getAddress().getStreet() : "",
+                            client.getAddress() != null ? client.getAddress().getNumber() : "",
+                            client.getAddress() != null ? client.getAddress().getCity() : "",
+                            client.getAddress() != null ? client.getAddress().getState() : "",
+                            client.getAddress() != null ? client.getAddress().getZipCode() : ""
+                        };
+                        tableModel.addRow(row);
+                    }
+                });
+                
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this,
+                        "Failed to load clients from Firebase:\n" + e.getMessage(),
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                });
+                e.printStackTrace();
+            }
+        });
     }
     
     private void deleteSelectedClient() {
@@ -109,16 +145,71 @@ public class DataWindow extends JFrame {
             JOptionPane.YES_NO_OPTION);
         
         if (confirm == JOptionPane.YES_OPTION) {
-            ClientStorage.removeClient(clientId);
-            loadClients();
-            JOptionPane.showMessageDialog(this,
-                "Client deleted successfully!",
-                "Success",
-                JOptionPane.INFORMATION_MESSAGE);
+            // Delete from Firebase in background
+            CompletableFuture.runAsync(() -> {
+                try {
+                    FirebaseService.getInstance().deleteClient(clientId).get();
+                    
+                    // Remove from local storage
+                    ClientStorage.removeClient(clientId);
+                    
+                    // Reload table on UI thread
+                    SwingUtilities.invokeLater(() -> {
+                        loadClients();
+                        Toast.show(this, "Client deleted successfully!", 2000);
+                    });
+                    
+                } catch (Exception e) {
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(this,
+                            "Failed to delete client from Firebase:\n" + e.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                    });
+                    e.printStackTrace();
+                }
+            });
         }
     }
     
+    private void startAutoRefresh() {
+        autoRefreshThread = new Thread(() -> {
+            while (isRunning) {
+                try {
+                    Thread.sleep(10000); // 10 seconds
+                    
+                    if (isRunning) {
+                        // Update table on UI thread
+                        SwingUtilities.invokeLater(() -> {
+                            loadClients();
+                            Toast.show(this, "Data refreshed - " + tableModel.getRowCount() + " clients", 2000);
+                            System.out.println("Auto-refreshed client data at: " + 
+                                new java.util.Date());
+                        });
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
+        
+        autoRefreshThread.setDaemon(true);
+        autoRefreshThread.setName("DataWindow-AutoRefresh");
+        autoRefreshThread.start();
+        System.out.println("Auto-refresh thread started - refreshing every 10 seconds");
+    }
+    
+    private void stopAutoRefresh() {
+        isRunning = false;
+        if (autoRefreshThread != null && autoRefreshThread.isAlive()) {
+            autoRefreshThread.interrupt();
+        }
+        System.out.println("Auto-refresh thread stopped");
+    }
+    
     private void goBack() {
+        stopAutoRefresh();
         MainWindow mainWindow = new MainWindow();
         mainWindow.setVisible(true);
         this.dispose();

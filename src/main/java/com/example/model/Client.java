@@ -4,16 +4,16 @@ public class Client {
     private String id;
     private String name;
     private String email;
-    private String phone;
+    private String cpf;
     private Address address;
     
     public Client() {}
     
-    public Client(String id, String name, String email, String phone, Address address) {
+    public Client(String id, String name, String email, String cpf, Address address) {
         this.id = id;
         this.name = name;
         this.email = email;
-        this.phone = phone;
+        this.cpf = cpf;
         this.address = address;
     }
     
@@ -26,8 +26,8 @@ public class Client {
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
     
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
+    public String getCpf() { return cpf; }
+    public void setCpf(String cpf) { this.cpf = cpf; }
     
     public Address getAddress() { return address; }
     public void setAddress(Address address) { this.address = address; }
@@ -35,6 +35,6 @@ public class Client {
     @Override
     public String toString() {
         return "Client{id='" + id + "', name='" + name + "', email='" + email + 
-               "', phone='" + phone + "', address=" + address + "}";
+               "', cpf='" + cpf + "', address=" + address + "}";
     }
 }

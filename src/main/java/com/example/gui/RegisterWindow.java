@@ -13,7 +13,7 @@ public class RegisterWindow extends JFrame {
     // Client fields
     private JTextField nameField;
     private JTextField emailField;
-    private JTextField phoneField;
+    private JTextField cpfField;
     
     // Address fields
     private JTextField streetField;
@@ -54,7 +54,7 @@ public class RegisterWindow extends JFrame {
         
         nameField = addFormField(formPanel, gbc, row++, "Name:");
         emailField = addFormField(formPanel, gbc, row++, "Email:");
-        phoneField = addFormField(formPanel, gbc, row++, "Phone:");
+        cpfField = addFormField(formPanel, gbc, row++, "CPF (11 digits):");
         
         // Address Information Section
         addSectionTitle(formPanel, gbc, row++, "Address Information");
@@ -122,6 +122,16 @@ public class RegisterWindow extends JFrame {
             return;
         }
         
+        // Validate CPF
+        String cpf = cpfField.getText().trim();
+        if (!cpf.matches("\\d{11}")) {
+            JOptionPane.showMessageDialog(this, 
+                "CPF must contain exactly 11 digits (numbers only)!", 
+                "Validation Error", 
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
         // Create Address
         Address address = new Address();
         address.setStreet(streetField.getText());
@@ -136,7 +146,7 @@ public class RegisterWindow extends JFrame {
         client.setId(java.util.UUID.randomUUID().toString());
         client.setName(nameField.getText());
         client.setEmail(emailField.getText());
-        client.setPhone(phoneField.getText());
+        client.setCpf(cpf);
         client.setAddress(address);
         
         // Save to local storage first
@@ -172,7 +182,7 @@ public class RegisterWindow extends JFrame {
     private void clearForm() {
         nameField.setText("");
         emailField.setText("");
-        phoneField.setText("");
+        cpfField.setText("");
         streetField.setText("");
         numberField.setText("");
         complementField.setText("");
